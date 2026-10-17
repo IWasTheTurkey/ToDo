@@ -1,4 +1,3 @@
-
 const P = {both:"Important + Urgent", important:"Important", urgent:"Urgent", general:"General"};
 const DAY = 864e5, ARCHIVE_AFTER = 14*DAY;
 let state = {tasks:{}, lists:{}, recurs:{}};
@@ -375,7 +374,7 @@ async function enableNotifications(){
 }
 async function sendTest(){
   const {data:{session}}=await sb.auth.getSession();
-  const r=await fetch(window.APP_CONFIG.SUPABASE_URL+"/functions/v1/tick",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+session.access_token},body:JSON.stringify({test:true})});
+  let r; try{ r=await fetch(window.APP_CONFIG.SUPABASE_URL+"/functions/v1/tick",{method:"POST",headers:{"Content-Type":"application/json",apikey:window.APP_CONFIG.SUPABASE_ANON_KEY,Authorization:"Bearer "+session.access_token},body:JSON.stringify({test:true})}); }catch(_){ throw new Error("Couldn't reach the reminder sender. Check it's deployed as \"tick\" with JWT verification off (setup step 6)."); }
   const j=await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.error||"The test couldn't be sent.");
   return j.sent?`Sent to ${j.sent} device${j.sent>1?"s":""}. It should arrive within a few seconds.`:"No devices have notifications on yet.";
 }
