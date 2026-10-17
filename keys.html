@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Setup keys</title>
+<style>
+body{margin:0;background:#13161a;color:#e6e9ec;font:15px/1.5 system-ui,sans-serif;padding:24px 16px}
+main{max-width:640px;margin:0 auto;display:grid;gap:16px}
+h1{margin:0;font-size:22px}
+p{margin:0;color:#8e979f}
+label{display:grid;gap:6px;font-weight:600}
+textarea{background:#1b1f24;color:#e6e9ec;border:1px solid #2e343b;border-radius:10px;padding:10px;font:13px ui-monospace,monospace;resize:none;word-break:break-all}
+.warn{color:#f2c46b}
+button{background:#2fbf5b;color:#06240f;border:0;border-radius:10px;padding:12px 16px;font-weight:700;justify-self:start;cursor:pointer}
+</style>
+</head>
+<body>
+<main>
+  <h1>Setup keys</h1>
+  <p>These keys are made here in your browser and aren't sent anywhere. Copy each one into the place the setup guide says. If you reload this page you'll get new keys, which is fine as long as you use one set throughout.</p>
+  <label>VAPID public key <span style="font-weight:400;color:#8e979f">(goes in config.js and in Supabase secrets)</span><textarea id="pub" rows="3" readonly></textarea></label>
+  <label>VAPID private key <span class="warn" style="font-weight:400">(Supabase secrets only. Keep it private.)</span><textarea id="priv" rows="2" readonly></textarea></label>
+  <label>Cron secret <span class="warn" style="font-weight:400">(Supabase secrets and 2-schedule.sql. Keep it private.)</span><textarea id="cron" rows="2" readonly></textarea></label>
+  <button id="again">Make new keys</button>
+</main>
+<script>
+const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+async function make(){
+  const kp = await crypto.subtle.generateKey({name:"ECDSA", namedCurve:"P-256"}, true, ["sign","verify"]);
+  document.getElementById("pub").value = b64u(await crypto.subtle.exportKey("raw", kp.publicKey));
+  document.getElementById("priv").value = (await crypto.subtle.exportKey("jwk", kp.privateKey)).d;
+  document.getElementById("cron").value = b64u(crypto.getRandomValues(new Uint8Array(24)));
+}
+document.getElementById("again").onclick = make;
+make();
+</script>
+</body>
+</html>

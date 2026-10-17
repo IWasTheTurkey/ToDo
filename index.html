@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>To Do List</title>
+<meta name="theme-color" content="#13161a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+html,body{margin:0}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+[hidden]{display:none!important}
+
+/* Layout: sticky header with tabs, single content column; board = 4 columns desktop, stacked on phone */
+:root{
+  --bg:#13161a; --surface:#1b1f24; --raise:#23282e; --line:#2e343b;
+  --fg:#e6e9ec; --muted:#8e979f;
+  --both:#2fbf5b; --urgent:#a6e8b2; --important:#a3cdf7; --general:#8e979f;
+  --danger:#ff7b72; --warn:#f2c46b;
+  --font:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:15px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--important);outline-offset:2px}
+.wrap{max-width:1180px;margin:0 auto;padding-block:0 96px}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:14px 10px;display:grid;gap:12px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+h1{font-size:20px;font-weight:700;margin:0;letter-spacing:-.01em}
+.sync{font-size:12px;color:var(--muted)}
+.tabs{display:flex;gap:4px;background:var(--surface);border-radius:12px;padding:4px;overflow-x:auto}
+.tabs button{flex:1;border:0;background:none;padding:9px 10px;border-radius:9px;font-weight:600;color:var(--muted);white-space:nowrap}
+.tabs button[aria-selected="true"]{background:var(--raise);color:var(--fg)}
+.tabs .count{font-size:12px;margin-left:4px;color:var(--muted);font-weight:500}
+.addrow{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.daypick{display:flex;gap:6px;flex-wrap:wrap}.daypick .toggle{padding:7px 0;width:40px;text-align:center}
+.task .btn{flex:none;padding:6px 10px;font-size:13px}
+.addtoggle{justify-self:start;display:flex;align-items:center;gap:8px;background:none;border:0;padding:4px 2px;color:var(--muted);font-weight:600;font-size:13px}
+.addtoggle .chev{width:8px;height:8px;border:solid currentColor;border-width:0 2px 2px 0;transform:rotate(-135deg) translate(-2px,-2px);transition:transform .15s}
+.addtoggle[aria-expanded="false"] .chev{transform:rotate(45deg) translate(-2px,-2px)}
+.addtoggle[aria-expanded="false"]{color:var(--both)}
+form.add{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:8px}
+form.add>*{grid-column:span 6}
+form.add>.tick{grid-column:span 3!important}
+form.add>#addDate{grid-column:1/-1!important}
+form.add:has(#addRem:checked)>#addDate{grid-column:span 6!important}
+form.add>#addTime{grid-column:span 6!important}
+form.add input{grid-column:1/-1;min-width:0;width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:11px 12px}
+form.add input[type=date],form.add input[type=time]{grid-column:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 10px}
+form.add input[type=time]{grid-column:1/-1}
+.tick{display:flex;align-items:center;justify-content:center;gap:10px;font-size:18px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 10px;font-weight:600;color:var(--muted);cursor:pointer;min-width:0}
+.tick input{width:18px!important;height:18px;flex:none;padding:0!important;margin:0;accent-color:var(--both);grid-column:auto!important}
+.tick.imp:has(input:checked){border-color:var(--important);color:var(--important)}
+.tick.urg:has(input:checked){border-color:var(--urgent);color:var(--urgent)}
+.tick.sch:has(input:checked){border-color:var(--warn)}
+.chip.school{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.filters{display:flex;gap:6px;flex-wrap:wrap}.filters button{border:1px solid var(--line);background:none;border-radius:99px;padding:5px 12px;font-size:13px;font-weight:600;color:var(--muted)}.filters button[aria-pressed="true"]{background:var(--raise);color:var(--fg);border-color:var(--fg)}
+.tick:has(input:checked){color:var(--fg)}
+form.add select{min-width:0;width:100%;padding-block:10px!important;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:0 8px}
+.btn{border:0;border-radius:10px;padding:10px 14px;background:var(--raise);font-weight:600}
+.btn.primary{background:var(--both);color:#06240f}
+.btn.ghost{background:none;color:var(--muted)}
+.btn.danger{background:none;color:var(--danger)}
+section.view{display:grid;gap:18px;padding-top:8px}
+h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 8px;font-weight:600;display:flex;align-items:center;gap:8px}
+.group{display:grid;gap:6px}
+.empty{color:var(--muted);font-size:14px;padding:14px;border:1px dashed var(--line);border-radius:10px;text-align:center}
+/* task card */
+.task{display:flex;gap:10px;align-items:flex-start;background:var(--surface);border-radius:10px;padding:10px 12px;border-left:4px solid var(--general);touch-action:pan-y;user-select:none}
+.task.p-both{border-left-color:var(--both)} .task.p-urgent{border-left-color:var(--urgent)} .task.p-important{border-left-color:var(--important)}
+.task .body{flex:1;min-width:0;cursor:pointer}
+.task .title{font-weight:500;overflow-wrap:anywhere}
+.task.done .title{text-decoration:line-through;color:var(--muted)}
+.meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px;font-size:12px;color:var(--muted)}
+.chip{padding:1px 8px;border-radius:99px;background:var(--raise);white-space:nowrap}
+.chip.important{background:color-mix(in srgb,var(--important) 22%,transparent);color:var(--important)}
+.chip.urgent{background:color-mix(in srgb,var(--urgent) 20%,transparent);color:var(--urgent)}
+.chip.both{background:var(--both);color:#06240f;font-weight:600}
+.chip.over{color:var(--danger)} .chip.soon{color:var(--warn)}
+.check{width:22px;height:22px;flex:none;border-radius:50%;border:2px solid var(--muted);background:none;margin-top:1px;display:grid;place-items:center;padding:0}
+.task.done .check{background:var(--both);border-color:var(--both)}
+.task.done .check::after{content:"";width:6px;height:10px;border:solid #06240f;border-width:0 2px 2px 0;transform:rotate(45deg) translate(-1px,-1px)}
+/* board */
+.board{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;align-items:start}
+.col{background:color-mix(in srgb,var(--surface) 55%,transparent);border-radius:12px;padding:10px;min-height:120px;display:grid;gap:6px;align-content:start;border:2px solid transparent;transition:border-color .15s}
+.col.over{border-color:var(--c)}
+.col h3{margin:0 0 4px;font-size:13px;font-weight:700;color:var(--c);display:flex;justify-content:space-between}
+.col[data-p="both"]{--c:var(--both)} .col[data-p="important"]{--c:var(--important)} .col[data-p="urgent"]{--c:var(--urgent)} .col[data-p="general"]{--c:var(--general)}
+.task.dragging{opacity:.4}
+/* lists */
+.listhead{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.listhead input{background:none;border:0;border-bottom:1px solid transparent;font-weight:700;font-size:16px;padding:2px 0;flex:1;min-width:0}
+.listhead input:focus{border-bottom-color:var(--line);outline:none}
+details.archive summary{cursor:pointer;color:var(--muted);font-size:14px;padding:6px 0}
+/* sheet */
+.scrim{position:fixed;inset:0;background:rgb(0 0 0 / .55);z-index:20;display:grid;place-items:end center}
+.sheet{background:var(--surface);width:min(560px,100%);border-radius:16px 16px 0 0;padding:18px max(18px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px));display:grid;gap:12px;max-height:90vh;overflow:auto}
+@media (min-width:700px){.scrim{place-items:center}.sheet{border-radius:16px}}
+.sheet label{display:grid;gap:4px;font-size:13px;color:var(--muted)}
+.sheet input[type=text],.sheet input[type=datetime-local],.sheet select{background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:10px;width:100%}
+.toggles{display:flex;gap:8px;flex-wrap:wrap}
+.toggle{border:1px solid var(--line);background:none;border-radius:99px;padding:7px 14px;font-weight:600;color:var(--muted)}
+.toggle[aria-pressed="true"].imp{background:var(--important);color:#0b2238;border-color:var(--important)}
+.toggle[aria-pressed="true"].urg{background:var(--urgent);color:#0b2a12;border-color:var(--urgent)}
+.toggle[aria-pressed="true"].tod{background:var(--raise);color:var(--fg);border-color:var(--fg)}
+.row{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap}
+.movegrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.movegrid button{border:2px solid var(--c);background:none;border-radius:10px;padding:14px 8px;font-weight:700;color:var(--c)}
+/* reminder banner */
+.toasts{position:fixed;left:0;right:0;bottom:0;padding:0 max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:grid;gap:8px;justify-items:center;z-index:30;pointer-events:none}
+.toast{pointer-events:auto;background:var(--raise);border:1px solid var(--both);border-radius:12px;padding:12px 14px;width:min(480px,100%);display:grid;gap:8px;box-shadow:0 8px 30px rgb(0 0 0 / .5)}
+.toast .t{font-weight:600}
+.toast .acts{display:flex;gap:6px;flex-wrap:wrap}
+.toast .acts button{border:0;border-radius:8px;padding:6px 10px;background:var(--surface);font-size:13px;font-weight:600}
+@media (max-width:700px){header{position:static}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+.gear{background:none;border:0;font-size:20px;color:var(--muted);padding:4px}
+#auth{max-width:380px;margin:12vh auto 0;display:grid;gap:14px}
+#auth h1{font-size:26px}
+#auth p{margin:0;color:var(--muted)}
+#authForm{display:grid;gap:10px}
+#authForm input{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px}
+#authForm .row{gap:8px}
+#authForm .row .btn{flex:1}
+#authMsg{min-height:1.4em;color:var(--warn);font-size:14px}
+
+</style>
+</head>
+<body>
+<section id="auth" hidden>
+  <h1>To Do List</h1>
+  <p>Sign in to see your tasks on any device.</p>
+  <form id="authForm">
+    <input type="email" id="authEmail" placeholder="Email" autocomplete="email" required>
+    <input type="password" id="authPass" placeholder="Password (8+ characters)" autocomplete="current-password">
+    <div class="row"><button class="btn primary" value="in">Sign in</button><button class="btn" value="up">Create account</button></div>
+    <button class="btn ghost" value="reset" formnovalidate>Forgot password?</button>
+    <div id="authMsg" role="status"></div>
+  </form>
+</section>
+
+
+<div class="wrap" id="app" hidden>
+  <header>
+    <div class="top"><h1>To Do List</h1><span style="display:flex;align-items:center;gap:10px"><span class="sync" id="sync">Loading…</span><button class="gear" id="gear" aria-label="Settings">⚙</button></span></div>
+    <nav class="tabs" role="tablist" id="tabs"></nav>
+    <div class="addrow"><button type="button" class="addtoggle" id="addToggle" aria-expanded="true" aria-controls="add"><span id="addToggleTxt">Hide add task</span><span class="chev" aria-hidden="true"></span></button>
+    <button type="button" class="addtoggle" id="recurBtn" data-act="recurring">🔁 Set up recurring tasks</button></div>
+    <form class="add" id="add">
+      <input id="addTitle" enterkeyhint="done" placeholder="Add a task" autocomplete="off" aria-label="New task">
+      <label class="tick imp" title="Important"><input type="checkbox" id="addImp" aria-label="Important"> <span aria-hidden="true">❗</span></label>
+      <label class="tick urg" title="Urgent"><input type="checkbox" id="addUrg" aria-label="Urgent"> <span aria-hidden="true">🕐</span></label>
+      <label class="tick sch" title="At school only"><input type="checkbox" id="addSch" aria-label="At school only"> <span aria-hidden="true">🏫</span></label>
+      <label class="tick" title="Reminder"><input type="checkbox" id="addRem" aria-label="Reminder"> <span aria-hidden="true">🔔</span></label>
+      <input type="date" id="addDate" aria-label="Due date">
+      <input type="time" id="addTime" aria-label="Reminder time" value="09:00" hidden>
+      <select id="addList" aria-label="List"></select>
+      <button class="btn primary" type="submit" aria-label="Add task">Add</button>
+    </form>
+  </header>
+  <main id="main"></main>
+</div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<div id="modal"></div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
