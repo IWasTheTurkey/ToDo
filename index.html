@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>To Do List</title>
 <meta name="theme-color" content="#13161a">
+<script>
+(function(){ var p="dark"; try{ p=localStorage.getItem("pb_theme")||"dark"; }catch(e){}
+  var t=p==="system"?(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark"):p;
+  document.documentElement.setAttribute("data-theme",t); })();
+</script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -133,6 +138,23 @@ details.archive summary{cursor:pointer;color:var(--muted);font-size:14px;padding
 #authForm input{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px}
 #authForm .row{gap:8px}
 #authForm .row .btn{flex:1}
+.kwlist{display:grid;gap:6px}
+.kwrow{display:flex;align-items:center;gap:6px}
+.kwsw{width:22px;height:22px;border-radius:6px;flex:none}
+.kwrow input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 10px}
+.kwmv{background:var(--raise);border:0;border-radius:7px;width:30px;height:32px;color:var(--muted);flex:none}
+.kwmv:disabled{opacity:.3}
+:root[data-theme="light"]{
+  --bg:#f2f4f3; --surface:#ffffff; --raise:#e6eae8; --line:#d3d9d6;
+  --fg:#1b1f24; --muted:#5b646c;
+  --both:#2fbf5b; --urgent:#4fae68; --important:#3f86cf; --general:#9aa3ab;
+  --danger:#cc3d33; --warn:#a86d12;
+  color-scheme:light;
+}
+:root[data-theme="light"] .task{box-shadow:0 1px 2px rgb(0 0 0 / .06)}
+.themepick{display:flex;gap:6px;flex-wrap:wrap}
+.themepick button{border:1px solid var(--line);background:none;border-radius:99px;padding:7px 14px;font-weight:600;color:var(--muted)}
+.themepick button[aria-pressed="true"]{background:var(--raise);color:var(--fg);border-color:var(--fg)}
 #authMsg{min-height:1.4em;color:var(--warn);font-size:14px}
 
 </style>

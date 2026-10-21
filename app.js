@@ -1,3 +1,4 @@
+
 const P = {both:"Important + Urgent", important:"Important", urgent:"Urgent", general:"General"};
 const DAY = 864e5, ARCHIVE_AFTER = 14*DAY;
 let state = {tasks:{}, lists:{}, recurs:{}};
@@ -20,11 +21,12 @@ const startOfDay = d => { const x=new Date(d); x.setHours(0,0,0,0); return +x; }
 /* ---------- storage: Supabase ---------- */
 const sb = supabase.createClient(window.APP_CONFIG.SUPABASE_URL, window.APP_CONFIG.SUPABASE_ANON_KEY);
 let me = null, channel = null;
-const allObjs = () => [...Object.values(state.lists), ...Object.values(state.tasks), ...Object.values(state.recurs||{})];
+const allObjs = () => [...(state.colours?[state.colours]:[]), ...Object.values(state.lists), ...Object.values(state.tasks), ...Object.values(state.recurs||{})];
 function ingest(objs){
-  state={tasks:{},lists:{},recurs:{}};
-  objs.forEach(o=>{ if(o.kind==="list") state.lists[o.id]=o; else if(o.kind==="task") state.tasks[o.id]=o; else if(o.kind==="recur") state.recurs[o.id]=o; });
+  state={tasks:{},lists:{},recurs:{},colours:null};
+  objs.forEach(o=>{ if(o.kind==="colours") state.colours=o; else if(o.kind==="list") state.lists[o.id]=o; else if(o.kind==="task") state.tasks[o.id]=o; else if(o.kind==="recur") state.recurs[o.id]=o; });
   if(!state.lists.inbox){ const ib={id:"inbox",kind:"list",name:"Inbox",order:0}; state.lists.inbox=ib; store&&store.save(ib); }
+  buildMatchers();
 }
 function makeStore(){
   return {
@@ -43,6 +45,7 @@ async function loadAll(){
 }
 function applyChange(p){
   if(p.eventType==="DELETE"){ const id=p.old&&p.old.id; if(id){ delete state.tasks[id]; delete state.lists[id]; delete state.recurs[id]; } }
+  else if(p.new&&p.new.data&&p.new.data.kind==="colours"){ state.colours=p.new.data; buildMatchers(); }
   else if(p.new&&p.new.data&&p.new.data.kind!=="settings"){ const o=p.new.data; bucket(o)[o.id]=o; }
   clearTimeout(applyChange.t); applyChange.t=setTimeout(render,80);
 }
@@ -75,12 +78,25 @@ function dueLabel(t){
   else txt=d.toLocaleDateString([], {weekday:"short",day:"numeric",month:"short"})+" "+time;
   return `<span class="chip ${cls}">${t.remind?"🔔 ":""}${txt}</span>`;
 }
+/* ---------- keyword colours ---------- */
+const PRESETS=[["Light green","#8fe0a0"],["Dark green","#3f9e5a"],["Blue","#6cb2f0"],["Purple","#b39af0"],["Pink","#f08cc4"],["Red","#f07a7a"],["Orange","#f2a65e"],["Yellow","#ecd36a"]];
+const defaultColours=()=>({id:"colours",kind:"colours",rules:PRESETS.map((_,i)=>({c:i,words:""}))});
+let matchers=[];
+function buildMatchers(){
+  const rules=(state.colours&&state.colours.rules)||[];
+  matchers=rules.map(r=>{ const ws=(r.words||"").split(",").map(w=>w.trim()).filter(Boolean);
+    if(!ws.length) return null;
+    const alt=ws.map(w=>w.replace(/[.*+?^${}()|[\]\\]/g,"\\$&").replace(/\s+/g,"\\s+")).join("|");
+    return {c:r.c, re:new RegExp("(^|[^\\p{L}\\p{N}])("+alt+")(?=$|[^\\p{L}\\p{N}])","iu")}; }).filter(Boolean);
+}
+const tintFor=title=>{ const m=matchers.find(m=>m.re.test(title||"")); return m?PRESETS[m.c][1]:null; };
+const tintStyle=title=>{ const c=tintFor(title); return c?` style="background:color-mix(in srgb,${c} 20%,var(--surface))"`:""; };
 function tagChips(t){ const p=prio(t); return (t.school?`<span class="chip school">🏫 School</span>`:"")+(p==="both"?`<span class="chip both">Important + Urgent</span>`:(t.important?`<span class="chip important">Important</span>`:"")+(t.urgent?`<span class="chip urgent">Urgent</span>`:"")); }
 function card(t,{showList=true,drag=false}={}){
   const p=prio(t), l=state.lists[t.list];
   const tags = p==="both"?`<span class="chip both">Important + Urgent</span>`:
     (t.important?`<span class="chip important">Important</span>`:"")+(t.urgent?`<span class="chip urgent">Urgent</span>`:"");
-  return `<div class="task p-${p}${t.done?" done":""}" data-id="${t.id}" ${drag?'draggable="true"':""}>
+  return `<div class="task p-${p}${t.done?" done":""}" data-id="${t.id}"${tintStyle(t.title)} ${drag?'draggable="true"':""}>
     <button class="check" data-act="toggle" aria-label="${t.done?"Mark not done":"Mark done"}"></button>
     <div class="body" data-act="edit"><div class="title">${esc(t.title)}</div>
     <div class="meta">${t.school?`<span class="chip school">🏫 School</span>`:""}${tags}${dueLabel(t)}${t.repeat&&t.repeat!=="none"?`<span class="chip">Repeats ${t.repeat}</span>`:""}${showList&&l?`<span class="chip">${esc(l.name)}</span>`:""}</div></div></div>`;
@@ -119,7 +135,7 @@ function render(){
     const today=startOfDay(Date.now()), rs=Object.values(state.recurs||{}).sort((a,b)=>a.title.localeCompare(b.title));
     const act=rs.filter(r=>!(r.end&&r.end<today)), ended=rs.filter(r=>r.end&&r.end<today);
     const rc=(r,isEnded)=>{ const l=state.lists[r.list];
-      return `<div class="task p-${prio(r)}" data-rid="${r.id}"><div class="body" data-act="editrecur"><div class="title">${esc(r.title)}</div>
+      return `<div class="task p-${prio(r)}" data-rid="${r.id}"${tintStyle(r.title)}><div class="body" data-act="editrecur"><div class="title">${esc(r.title)}</div>
       <div class="meta">${tagChips(r)}<span class="chip">${daysLabel(r.days)}</span>${r.time?`<span class="chip">🔔 ${r.time}</span>`:""}${l?`<span class="chip">${esc(l.name)}</span>`:""}<span class="chip">${isEnded?"Ended":"Until"} ${r.end?fmtDate(r.end):"no end"}</span>${r.paused?'<span class="chip soon">Paused</span>':""}</div></div>
       ${isEnded?`<button class="btn" data-act="renew">Renew 10 wks</button>`:`<button class="btn ghost" data-act="pause">${r.paused?"Resume":"Pause"}</button>`}</div>`; };
     m.innerHTML=`<section class="view"><div class="row"><button class="btn ghost" data-act="back">← Back</button><button class="btn primary" data-act="newrecur">+ New recurring task</button></div>
@@ -213,7 +229,7 @@ function editor(t){
       <button type="button" class="toggle tod" id="edTod" aria-pressed="${!!t.today}">Flag for today</button>
     </div>
     <label>List<select id="edList">${lists().map(l=>`<option value="${l.id}" ${l.id===t.list?"selected":""}>${esc(l.name)}</option>`).join("")}</select></label>
-    <label>Due date and time<input type="datetime-local" id="edDue" value="${toLocalInput(t.due)}"></label>
+    <label>Due date and time<span style="display:flex;gap:8px"><input type="datetime-local" id="edDue" value="${toLocalInput(t.due)}" style="flex:1;min-width:0"><button type="button" class="btn ghost" id="edClear" style="flex:none">Remove date</button></span></label>
     <label style="display:flex;align-items:center;gap:8px;color:var(--fg)"><input type="checkbox" id="edRem" ${t.remind?"checked":""}> Remind me at this time</label>
     <label>Repeat<select id="edRep">${["none","daily","weekly","monthly"].map(r=>`<option value="${r}" ${t.repeat===r?"selected":""}>${r==="none"?"Doesn't repeat":r[0].toUpperCase()+r.slice(1)}</option>`).join("")}</select></label>
     <div class="row"><button type="button" class="btn danger" id="edDel">Delete task</button>
@@ -222,6 +238,7 @@ function editor(t){
   ["edImp","edUrg","edTod","edSch"].forEach(i=>$("#"+i).onclick=e=>e.target.setAttribute("aria-pressed",e.target.getAttribute("aria-pressed")!=="true"));
   $("#scrim").onclick=e=>{ if(e.target.id==="scrim") closeModal(); };
   $("#edCancel").onclick=closeModal;
+  $("#edClear").onclick=()=>{ $("#edDue").value=""; $("#edRem").checked=false; };
   $("#edDel").onclick=()=>{ closeModal(); del(t); };
   $("#ed").onsubmit=e=>{ e.preventDefault();
     const due=$("#edDue").value?+new Date($("#edDue").value):null;
@@ -378,16 +395,42 @@ async function sendTest(){
   const j=await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.error||"The test couldn't be sent.");
   return j.sent?`Sent to ${j.sent} device${j.sent>1?"s":""}. It should arrive within a few seconds.`:"No devices have notifications on yet.";
 }
+/* ---------- theme ---------- */
+const themePref=()=>{ try{ return localStorage.getItem("pb_theme")||"dark"; }catch(e){ return "dark"; } };
+function applyTheme(){ const p=themePref(), t=p==="system"?(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark"):p;
+  document.documentElement.setAttribute("data-theme",t);
+  const m=document.querySelector('meta[name="theme-color"]'); if(m) m.content=t==="light"?"#f2f4f3":"#13161a"; }
+function setTheme(p){ try{ localStorage.setItem("pb_theme",p); }catch(e){} applyTheme(); }
+matchMedia("(prefers-color-scheme: light)").addEventListener("change",()=>{ if(themePref()==="system") applyTheme(); });
+applyTheme();
 function settings(){
   $("#modal").innerHTML=`<div class="scrim" id="scrim"><div class="sheet"><strong>Settings</strong>
+    <div><div style="font-weight:600">Appearance</div><p class="sync" style="margin:4px 0 8px">Saved on this device only.</p>
+      <div class="themepick">${[["dark","Dark"],["light","Light"],["system","Match device"]].map(([k,n])=>`<button data-theme-pick="${k}" aria-pressed="${themePref()===k}">${n}</button>`).join("")}</div></div>
     <div><div style="font-weight:600">Notifications</div><p class="sync" id="nStat" style="margin:4px 0 8px">Checking…</p>
       <div class="toggles"><button class="btn primary" id="nOn">Turn on for this device</button><button class="btn" id="nTest">Send test</button></div></div>
+    <div><div style="font-weight:600">Keyword colours</div><p class="sync" style="margin:4px 0 8px">Tasks containing these words get a coloured tint. Separate words with commas. Higher colours win if a task matches two.</p>
+      <div class="kwlist" id="kwList"></div>
+      <div class="toggles" style="margin-top:8px"><button class="btn primary" id="kwSave">Save colours</button></div></div>
     <div><div style="font-weight:600">Your data</div><p class="sync" style="margin:4px 0 8px">Import tasks from a file, or save a backup copy.</p>
       <div class="toggles"><label class="btn" style="display:inline-block">Import file<input type="file" id="imp" accept=".json,application/json" hidden></label><button class="btn" id="exp">Save backup</button></div></div>
     <p class="sync" id="sMsg" style="margin:0"></p>
     <div class="row"><button class="btn danger" id="out">Sign out</button><button class="btn ghost" id="sClose">Close</button></div></div></div>`;
   const msg=t=>{ $("#sMsg").textContent=t; };
   notifStatus().then(t=>$("#nStat").textContent=t);
+  document.querySelectorAll("[data-theme-pick]").forEach(b=>b.onclick=()=>{ setTheme(b.dataset.themePick);
+    document.querySelectorAll("[data-theme-pick]").forEach(x=>x.setAttribute("aria-pressed",x===b)); });
+  let kw=JSON.parse(JSON.stringify(state.colours||defaultColours()));
+  PRESETS.forEach((_,i)=>{ if(!kw.rules.some(r=>r.c===i)) kw.rules.push({c:i,words:""}); });
+  const drawKw=()=>{ $("#kwList").innerHTML=kw.rules.map((r,i)=>`<div class="kwrow">
+      <span class="kwsw" style="background:${PRESETS[r.c][1]}" title="${PRESETS[r.c][0]}"></span>
+      <input type="text" data-kw="${i}" value="${esc(r.words)}" placeholder="${PRESETS[r.c][0]}: e.g. phonics, literacy" aria-label="${PRESETS[r.c][0]} words">
+      <button class="kwmv" data-up="${i}" aria-label="Move up" ${i?"":"disabled"}>▲</button><button class="kwmv" data-down="${i}" aria-label="Move down" ${i<kw.rules.length-1?"":"disabled"}>▼</button></div>`).join("");
+    document.querySelectorAll("[data-kw]").forEach(inp=>inp.oninput=()=>{ kw.rules[+inp.dataset.kw].words=inp.value; });
+    document.querySelectorAll("[data-up],[data-down]").forEach(b=>b.onclick=()=>{ const i=+(b.dataset.up??b.dataset.down), j=b.dataset.up!=null?i-1:i+1;
+      [kw.rules[i],kw.rules[j]]=[kw.rules[j],kw.rules[i]]; drawKw(); }); };
+  drawKw();
+  $("#kwSave").onclick=()=>{ state.colours=kw; buildMatchers(); store.save(kw); render(); msg("Colours saved."); };
   $("#scrim").onclick=e=>{ if(e.target.id==="scrim") closeModal(); }; $("#sClose").onclick=closeModal;
   $("#nOn").onclick=async()=>{ msg("Turning on…"); try{ await enableNotifications(); msg("Done."); $("#nStat").textContent=await notifStatus(); }catch(e){ msg(e.message||String(e)); } };
   $("#nTest").onclick=async()=>{ msg("Sending…"); try{ msg(await sendTest()); }catch(e){ msg(e.message); } };
@@ -396,7 +439,7 @@ function settings(){
     a.href=URL.createObjectURL(blob); a.download="todo-backup-"+dkey(Date.now())+".json"; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000); };
   $("#imp").onchange=async e=>{ const f=e.target.files[0]; if(!f) return; msg("Importing…");
     try{ const arr=JSON.parse(await f.text()); if(!Array.isArray(arr)) throw new Error("That file isn't a task backup.");
-      const objs=arr.filter(o=>o&&o.id&&["task","list","recur"].includes(o.kind));
+      const objs=arr.filter(o=>o&&o.id&&["task","list","recur","colours"].includes(o.kind));
       await store.saveMany(objs); await loadAll(); msg(`Imported ${objs.length} items.`); }
     catch(err){ msg("Import failed: "+(err.message||err)); } };
 }
